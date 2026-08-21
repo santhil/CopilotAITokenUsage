@@ -1,0 +1,10 @@
+out/
+dist/
+node_modules/
+.DS_Store
+*.vsix
+coverage/
+.nyc_output/
+*.log
+.env
+.env.local
