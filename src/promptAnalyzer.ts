@@ -59,8 +59,6 @@ export interface UsageAnalysis {
   estimatedOutputTokens: number;
   technicalTaskPercentage: number;
   longResponseCount: number;
-  mostUsedModel: string | null;
-  modelDistribution: Record<string, number>;
   inappropriateModelCount: number;
   inappropriateModels: Array<{
     prompt: string;
@@ -543,7 +541,6 @@ export class PromptAnalyzer {
       'unknown': 0,
     };
 
-    const modelDistribution: Record<string, number> = {};
     const inappropriateModels: Array<{prompt: string; usedModel: string; suggestedModel: string}> = [];
     let totalQuality = 0;
     let totalPromptLength = 0;
@@ -552,14 +549,6 @@ export class PromptAnalyzer {
 
     for (const interaction of this.interactions) {
       taskBreakdown[interaction.taskCategory]++;
-
-      const normalizedModel = interaction.model && interaction.model !== 'unknown' && interaction.model !== 'copilot/auto'
-        ? interaction.model
-        : null;
-
-      if (normalizedModel) {
-        modelDistribution[normalizedModel] = (modelDistribution[normalizedModel] || 0) + 1;
-      }
 
       totalQuality += interaction.promptQuality.overallScore;
       totalPromptLength += interaction.promptLength;
@@ -601,9 +590,6 @@ export class PromptAnalyzer {
       ? Math.round((technicalTaskCount / this.interactions.length) * 100)
       : 0;
 
-    const mostUsedModel = Object.entries(modelDistribution)
-      .sort(([, firstCount], [, secondCount]) => secondCount - firstCount)[0]?.[0] || null;
-
     const skillRating = this.calculateSkillRating(taskBreakdown, averagePromptQuality, inappropriateModels.length);
     const overallRecommendations = this.generateRecommendations(taskBreakdown, skillRating, averagePromptQuality);
     const smartModelRecommendations = this.buildSmartModelRecommendations();
@@ -618,8 +604,6 @@ export class PromptAnalyzer {
       estimatedOutputTokens: Math.ceil(totalResponseLength / 4),
       technicalTaskPercentage,
       longResponseCount,
-      mostUsedModel,
-      modelDistribution,
       inappropriateModelCount: inappropriateModels.length,
       inappropriateModels: inappropriateModels.slice(0, 5), // Top 5
       skillRating,
@@ -735,7 +719,6 @@ export class PromptAnalyzer {
     output += `Estimated Input Tokens: ${analysis.estimatedInputTokens}\n`;
     output += `Estimated Output Tokens: ${analysis.estimatedOutputTokens}\n`;
     output += `Technical Task Focus: ${analysis.technicalTaskPercentage}%\n`;
-    output += `Most Used Model: ${analysis.mostUsedModel || 'Unknown'}\n`;
     output += `Long Responses: ${analysis.longResponseCount}\n`;
     output += `Inappropriate Model Usages: ${analysis.inappropriateModelCount}\n\n`;
 

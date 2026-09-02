@@ -310,28 +310,6 @@ function generateAnalysisHTML(analysis: any): string {
     )
     .join('');
 
-  const modelDistHTML = Object.entries(analysis.modelDistribution)
-    .filter(([model]: any) => model && model !== 'unknown' && model !== 'copilot/auto')
-    .map(([model, count]: any) => 
-      `<div style="display: flex; justify-content: space-between; padding: 4px 0;">
-        <span>${model}</span>
-        <strong>${count}</strong>
-      </div>`
-    )
-    .join('') || '<div style="opacity: 0.7; padding: 8px 0;">Model metadata was not available in the transcript. The extension will show model usage only when Copilot exposes the model name.</div>';
-
-  const smartRecommendationsHTML = Object.entries(analysis.smartModelRecommendations || {})
-    .filter(([task, recommendation]: any) => task !== 'unknown' && recommendation && recommendation.recommendedModel !== 'n/a')
-    .slice(0, 6)
-    .map(([task, recommendation]: any) => 
-      `<div style="padding: 8px 0; border-bottom: 1px solid var(--vscode-panel-border);">
-        <div style="font-weight: 600; margin-bottom: 4px; text-transform: capitalize;">${task.replace('-', ' ')}</div>
-        <div style="color: var(--vscode-descriptionForeground); font-size: 11px; margin-bottom: 2px;">Best fit: ${recommendation.recommendedModel}</div>
-        <div style="font-size: 11px; opacity: 0.9;">${recommendation.reason}</div>
-      </div>`
-    )
-    .join('');
-
   const inappropriateHTML = analysis.inappropriateModels.length > 0
     ? analysis.inappropriateModels
         .map((item: any) => `
@@ -533,10 +511,6 @@ function generateAnalysisHTML(analysis: any): string {
               <div style="color: var(--vscode-descriptionForeground); font-size: 12px;">Technical Task Focus</div>
               <div style="font-size: 20px; font-weight: bold;">${analysis.technicalTaskPercentage}%</div>
             </div>
-            <div>
-              <div style="color: var(--vscode-descriptionForeground); font-size: 12px;">Most Used Model</div>
-              <div style="font-size: 16px; font-weight: bold; word-break: break-word;">${analysis.mostUsedModel || 'Unknown'}</div>
-            </div>
           </div>
           <div style="margin-top: 12px; color: var(--vscode-descriptionForeground); font-size: 12px;">
             Token values are estimates based on transcript text length and are not Copilot billing totals.
@@ -547,18 +521,6 @@ function generateAnalysisHTML(analysis: any): string {
         <div class="metric-card">
           <h3>📑 Task Breakdown</h3>
           ${taskBreakdownHTML}
-        </div>
-
-        <!-- Model Distribution -->
-        <div class="metric-card">
-          <h3>🤖 Model Distribution</h3>
-          ${modelDistHTML}
-        </div>
-
-        <!-- Smart Model Recommendations -->
-        <div class="metric-card">
-          <h3>🧠 Smart Model Recommendations</h3>
-          ${smartRecommendationsHTML || '<div style="opacity: 0.7; padding: 8px 0;">No recommendations available yet.</div>'}
         </div>
 
         <!-- Inappropriate Model Usage -->
