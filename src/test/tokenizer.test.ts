@@ -1,5 +1,40 @@
 import * as assert from 'assert';
+import { PromptAnalyzer } from '../promptAnalyzer';
+import { CopilotLogWatcher } from '../telemetryWatcher';
 import { TokenCalculator } from '../tokenizerEngine';
+
+describe('PromptAnalyzer smart model recommendations', () => {
+  it('should recommend Claude for debugging prompts', () => {
+    const analyzer = new PromptAnalyzer('dummy.jsonl');
+    const recommendation = analyzer.getSmartModelRecommendation(
+      'My React app crashes after login with TypeError: Cannot read property map of undefined',
+      'debugging'
+    );
+
+    assert.strictEqual(recommendation.recommendedModel, 'claude-3.5-sonnet');
+    assert.ok(recommendation.reason.toLowerCase().includes('debugging'));
+  });
+
+  it('should recommend GPT-4o for architectural advice', () => {
+    const analyzer = new PromptAnalyzer('dummy.jsonl');
+    const recommendation = analyzer.getSmartModelRecommendation(
+      'Design a scalable event-driven architecture for a payment service',
+      'architectural-advice'
+    );
+
+    assert.strictEqual(recommendation.recommendedModel, 'gpt-4o');
+    assert.ok(recommendation.reason.toLowerCase().includes('architecture'));
+  });
+});
+
+describe('Copilot model detection', () => {
+  it('should not invent a model when transcript has no model metadata', () => {
+    const watcher = new CopilotLogWatcher('fake-path', 'workspace-1');
+    const detectedModel = (watcher as any).detectCurrentModel();
+
+    assert.strictEqual(detectedModel, 'unknown');
+  });
+});
 
 describe('TokenCalculator', () => {
   let calculator: TokenCalculator;

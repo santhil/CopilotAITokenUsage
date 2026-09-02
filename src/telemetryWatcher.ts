@@ -607,11 +607,10 @@ export class CopilotLogWatcher extends EventEmitter {
     assistantMsg: TranscriptEvent,
     assistantData?: Record<string, unknown>
   ): TurnCompletedPayload | null {
-    // Try to get model from various sources in order of preference
-    let model = this.detectCurrentModel();
+    // Prefer transcript-reported model. Avoid fabricating a model when the transcript doesn't include one.
+    let model = 'unknown';
 
     if (assistantData) {
-      // Try common field names for model info in case it's stored in transcript
       const modelField =
         assistantData.model ||
         assistantData.modelId ||
@@ -628,6 +627,13 @@ export class CopilotLogWatcher extends EventEmitter {
         if (metaModel && typeof metaModel === 'string') {
           model = metaModel;
         }
+      }
+    }
+
+    if (model === 'unknown') {
+      const detectedModel = this.detectCurrentModel();
+      if (detectedModel && detectedModel !== 'unknown' && detectedModel !== 'copilot/auto') {
+        model = detectedModel;
       }
     }
 
@@ -704,81 +710,54 @@ export class CopilotLogWatcher extends EventEmitter {
       return this.cachedDetectedModel;
     }
 
-    try {
-      // Try Copilot Chat settings - check multiple possible setting keys
-      const chatConfig = vscode.workspace.getConfiguration('github.copilot-chat');
-      
-      const possibleKeys = [
-        'selectedModel',
-        'model',
-        'currentModel',
-        'preferredModel',
-        'defaultModel',
-      ];
-      
+    const allConfigs = [
+      vscode.workspace.getConfiguration('github.copilot-chat'),
+      vscode.workspace.getConfiguration('github.copilot'),
+      vscode.workspace.getConfiguration('chat'),
+      vscode.workspace.getConfiguration(),
+    ];
+
+    const possibleKeys = [
+      'selectedModel',
+      'model',
+      'currentModel',
+      'preferredModel',
+      'defaultModel',
+      'chatModel',
+      'agentModel',
+      'copilotModel',
+    ];
+
+    for (const config of allConfigs) {
       for (const key of possibleKeys) {
-        const value = chatConfig.get<string>(key);
-        if (value && typeof value === 'string' && value.length > 0) {
-          this.cachedDetectedModel = value;
-          this.cachedModelAt = now;
-          return value;
+        try {
+          const value = config.get<string>(key);
+          if (value && typeof value === 'string' && value.length > 0 && value !== 'copilot/auto') {
+            this.cachedDetectedModel = value;
+            this.cachedModelAt = now;
+            return value;
+          }
+        } catch {
+          // Ignore config access failures and continue scanning other config sources.
         }
       }
-    } catch (e) {
-      // Ignore unavailable settings.
     }
 
     try {
-      // Try general Copilot settings
-      const copilotConfig = vscode.workspace.getConfiguration('github.copilot');
-      
-      const possibleKeys = [
-        'preferredModel',
-        'model',
-        'selectedModel',
-        'defaultModel',
-      ];
-      
-      for (const key of possibleKeys) {
-        const value = copilotConfig.get<string>(key);
-        if (value && typeof value === 'string' && value.length > 0) {
-          this.cachedDetectedModel = value;
-          this.cachedModelAt = now;
-          return value;
-        }
-      }
-    } catch (e) {
-      // Ignore unavailable settings.
-    }
-
-    try {
-      // Fallback: parse VS Code renderer logs where ChatModelSelection is recorded.
       const fromRendererLogs = this.detectModelFromRendererLogs();
-      if (fromRendererLogs) {
+      if (fromRendererLogs && fromRendererLogs !== 'copilot/auto') {
         this.cachedDetectedModel = fromRendererLogs;
         this.cachedModelAt = now;
         return fromRendererLogs;
       }
-    } catch (e) {
+    } catch {
       // Ignore renderer log lookup failures.
     }
 
-    try {
-      // Try our extension settings
-      const config = vscode.workspace.getConfiguration('copilotTokenInspector');
-      const defaultModel = config.get<string>('defaultModelEncoding', 'gpt-4o');
-      if (defaultModel && defaultModel.length > 0) {
-        this.cachedDetectedModel = defaultModel;
-        this.cachedModelAt = now;
-        return defaultModel;
-      }
-    } catch (e) {
-      // Ignore extension config lookup failures.
-    }
-
-    // Ultimate fallback
-    log('[Model] ⚠️ No model found in settings, using hardcoded fallback: gpt-4o');
-    return 'gpt-4o';
+    // Do not fabricate a model when the transcript does not expose one.
+    this.cachedDetectedModel = 'unknown';
+    this.cachedModelAt = now;
+    return 'unknown';
   }
 
   /**

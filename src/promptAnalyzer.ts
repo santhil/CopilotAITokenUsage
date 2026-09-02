@@ -17,6 +17,7 @@ export interface InteractionAnalysis {
   modelSuggestion?: string;
   timestamp?: string;
   suggestions: string[];
+  smartModelRecommendation?: SmartModelRecommendation;
 }
 
 /**
@@ -68,6 +69,13 @@ export interface UsageAnalysis {
   }>;
   skillRating: SkillRating;
   overallRecommendations: string[];
+  smartModelRecommendations: Record<string, SmartModelRecommendation>;
+}
+
+export interface SmartModelRecommendation {
+  recommendedModel: string;
+  reason: string;
+  costProfile: 'efficient' | 'balanced' | 'premium';
 }
 
 /**
@@ -198,6 +206,7 @@ export class PromptAnalyzer {
     const modelAppropriate = this.isModelAppropriate(taskCategory, model);
     const modelSuggestion = modelAppropriate ? undefined : this.suggestBetterModel(taskCategory, model);
     const suggestions = this.generateSuggestions(promptText, promptQuality, taskCategory);
+    const smartModelRecommendation = this.getSmartModelRecommendation(promptText, taskCategory);
 
     return {
       promptText: promptText.substring(0, 200),
@@ -211,6 +220,7 @@ export class PromptAnalyzer {
       modelSuggestion,
       timestamp,
       suggestions,
+      smartModelRecommendation,
     };
   }
 
@@ -359,6 +369,126 @@ export class PromptAnalyzer {
   }
 
   /**
+   * Recommend the best model for a prompt based on task type and prompt complexity
+   */
+  public getSmartModelRecommendation(prompt: string, taskCategory: TaskCategory): SmartModelRecommendation {
+    const lowerPrompt = prompt.toLowerCase();
+    const isComplex = lowerPrompt.length > 1200 || /stack trace|error:|exception|architecture|design system|migration|refactor/.test(lowerPrompt);
+
+    if (taskCategory === 'debugging') {
+      return {
+        recommendedModel: 'claude-3.5-sonnet',
+        reason: 'Debugging prompts often benefit from strong reasoning and careful, context-aware analysis.',
+        costProfile: isComplex ? 'balanced' : 'efficient',
+      };
+    }
+
+    if (taskCategory === 'architectural-advice') {
+      return {
+        recommendedModel: 'gpt-4o',
+        reason: 'Architecture prompts require higher reasoning quality and broad system-level tradeoff analysis.',
+        costProfile: 'premium',
+      };
+    }
+
+    if (taskCategory === 'code-generation') {
+      return {
+        recommendedModel: isComplex ? 'gpt-4o' : 'gpt-4o',
+        reason: 'Code generation benefits from strong synthesis, consistency, and structured output.',
+        costProfile: 'balanced',
+      };
+    }
+
+    if (taskCategory === 'refactoring' || taskCategory === 'optimization') {
+      return {
+        recommendedModel: 'gpt-4o',
+        reason: 'Refactoring and optimization work best with a capable model that can preserve correctness while improving structure.',
+        costProfile: 'balanced',
+      };
+    }
+
+    if (taskCategory === 'testing') {
+      return {
+        recommendedModel: 'gpt-4o',
+        reason: 'Testing tasks need good reasoning to propose relevant edge cases and precise assertions.',
+        costProfile: 'efficient',
+      };
+    }
+
+    if (taskCategory === 'documentation' || taskCategory === 'explanation' || taskCategory === 'factual-query') {
+      return {
+        recommendedModel: 'gpt-4o-mini',
+        reason: 'These tasks are usually lower complexity and can be handled efficiently with a cheaper model.',
+        costProfile: 'efficient',
+      };
+    }
+
+    if (taskCategory === 'time-date-query') {
+      return {
+        recommendedModel: 'n/a',
+        reason: 'Use a system clock or tool instead of an AI model for current time and date tasks.',
+        costProfile: 'efficient',
+      };
+    }
+
+    return {
+      recommendedModel: 'gpt-4o',
+      reason: 'This prompt is ambiguous; a capable general-purpose model is the safest default choice.',
+      costProfile: 'balanced',
+    };
+  }
+
+  private buildSmartModelRecommendations(): Record<string, SmartModelRecommendation> {
+    const tasks: TaskCategory[] = [
+      'debugging',
+      'code-generation',
+      'architectural-advice',
+      'refactoring',
+      'testing',
+      'documentation',
+      'explanation',
+      'optimization',
+      'factual-query',
+      'time-date-query',
+      'unknown',
+    ];
+
+    const recommendations: Record<string, SmartModelRecommendation> = {};
+    for (const task of tasks) {
+      recommendations[task] = this.getSmartModelRecommendation(this.getPromptExampleForTask(task), task);
+    }
+
+    return recommendations;
+  }
+
+  private getPromptExampleForTask(taskCategory: TaskCategory): string {
+    switch (taskCategory) {
+      case 'debugging':
+        return 'My React app crashes with TypeError: Cannot read properties of undefined after login';
+      case 'code-generation':
+        return 'Generate a TypeScript function that validates email addresses and returns a reusable result object';
+      case 'architectural-advice':
+        return 'Design a scalable microservice architecture for a checkout workflow with event-driven processing';
+      case 'refactoring':
+        return 'Refactor this service to reduce duplication and separate validation from business logic';
+      case 'testing':
+        return 'Write unit tests for the transaction service including edge cases and error handling';
+      case 'documentation':
+        return 'Document how the API authentication flow works for new developers';
+      case 'explanation':
+        return 'Explain how async/await works in JavaScript and when to use it';
+      case 'optimization':
+        return 'Optimize this data processing pipeline to reduce memory usage and latency';
+      case 'factual-query':
+        return 'What is the difference between a hash map and a tree map in Java';
+      case 'time-date-query':
+        return 'What is the current date and time in UTC?';
+      default:
+        return 'Help me decide the best approach for this engineering problem';
+    }
+  }
+
+  /**
    * Generate improvement suggestions with example prompts
    */
   private generateSuggestions(prompt: string, quality: PromptQualityScore, taskCategory: TaskCategory): string[] {
@@ -422,7 +552,15 @@ export class PromptAnalyzer {
 
     for (const interaction of this.interactions) {
       taskBreakdown[interaction.taskCategory]++;
-      modelDistribution[interaction.model] = (modelDistribution[interaction.model] || 0) + 1;
+
+      const normalizedModel = interaction.model && interaction.model !== 'unknown' && interaction.model !== 'copilot/auto'
+        ? interaction.model
+        : null;
+
+      if (normalizedModel) {
+        modelDistribution[normalizedModel] = (modelDistribution[normalizedModel] || 0) + 1;
+      }
+
       totalQuality += interaction.promptQuality.overallScore;
       totalPromptLength += interaction.promptLength;
       totalResponseLength += interaction.responseLength;
@@ -468,6 +606,7 @@ export class PromptAnalyzer {
 
     const skillRating = this.calculateSkillRating(taskBreakdown, averagePromptQuality, inappropriateModels.length);
     const overallRecommendations = this.generateRecommendations(taskBreakdown, skillRating, averagePromptQuality);
+    const smartModelRecommendations = this.buildSmartModelRecommendations();
 
     return {
       totalInteractions: this.interactions.length,
@@ -485,6 +624,7 @@ export class PromptAnalyzer {
       inappropriateModels: inappropriateModels.slice(0, 5), // Top 5
       skillRating,
       overallRecommendations,
+      smartModelRecommendations,
     };
   }
 

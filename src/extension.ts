@@ -311,10 +311,23 @@ function generateAnalysisHTML(analysis: any): string {
     .join('');
 
   const modelDistHTML = Object.entries(analysis.modelDistribution)
+    .filter(([model]: any) => model && model !== 'unknown' && model !== 'copilot/auto')
     .map(([model, count]: any) => 
       `<div style="display: flex; justify-content: space-between; padding: 4px 0;">
         <span>${model}</span>
         <strong>${count}</strong>
+      </div>`
+    )
+    .join('') || '<div style="opacity: 0.7; padding: 8px 0;">Model metadata was not available in the transcript. The extension will show model usage only when Copilot exposes the model name.</div>';
+
+  const smartRecommendationsHTML = Object.entries(analysis.smartModelRecommendations || {})
+    .filter(([task, recommendation]: any) => task !== 'unknown' && recommendation && recommendation.recommendedModel !== 'n/a')
+    .slice(0, 6)
+    .map(([task, recommendation]: any) => 
+      `<div style="padding: 8px 0; border-bottom: 1px solid var(--vscode-panel-border);">
+        <div style="font-weight: 600; margin-bottom: 4px; text-transform: capitalize;">${task.replace('-', ' ')}</div>
+        <div style="color: var(--vscode-descriptionForeground); font-size: 11px; margin-bottom: 2px;">Best fit: ${recommendation.recommendedModel}</div>
+        <div style="font-size: 11px; opacity: 0.9;">${recommendation.reason}</div>
       </div>`
     )
     .join('');
@@ -540,6 +553,12 @@ function generateAnalysisHTML(analysis: any): string {
         <div class="metric-card">
           <h3>🤖 Model Distribution</h3>
           ${modelDistHTML}
+        </div>
+
+        <!-- Smart Model Recommendations -->
+        <div class="metric-card">
+          <h3>🧠 Smart Model Recommendations</h3>
+          ${smartRecommendationsHTML || '<div style="opacity: 0.7; padding: 8px 0;">No recommendations available yet.</div>'}
         </div>
 
         <!-- Inappropriate Model Usage -->
