@@ -310,19 +310,6 @@ function generateAnalysisHTML(analysis: any): string {
     )
     .join('');
 
-  const inappropriateHTML = analysis.inappropriateModels.length > 0
-    ? analysis.inappropriateModels
-        .map((item: any) => `
-          <div style="background-color: var(--vscode-inputValidation-warningBackground); border-left: 3px solid var(--vscode-inputValidation-warningBorder); padding: 8px; margin: 8px 0; border-radius: 2px;">
-            <div style="font-size: 12px; margin-bottom: 4px;"><strong>❌ Wrong Model:</strong></div>
-            <div style="font-size: 11px; margin-bottom: 6px; opacity: 0.9;">Prompt: ${item.prompt.substring(0, 100)}...</div>
-            <div style="font-size: 11px; margin-bottom: 4px;"><strong>Used:</strong> ${item.usedModel}</div>
-            <div style="font-size: 11px;"><strong>Suggested:</strong> ${item.suggestedModel}</div>
-          </div>
-        `)
-        .join('')
-    : '<div style="text-align: center; opacity: 0.7; padding: 16px;">✅ All model selections were appropriate!</div>';
-
   return `
     <!DOCTYPE html>
     <html>
@@ -523,12 +510,6 @@ function generateAnalysisHTML(analysis: any): string {
           ${taskBreakdownHTML}
         </div>
 
-        <!-- Inappropriate Model Usage -->
-        <div class="metric-card">
-          <h3>⚠️ Model Selection Review</h3>
-          ${inappropriateHTML}
-        </div>
-
         <!-- Summary Stats -->
         <div class="metric-card">
           <h3>📊 Summary Statistics</h3>
@@ -552,10 +533,6 @@ function generateAnalysisHTML(analysis: any): string {
             <div>
               <div style="color: var(--vscode-descriptionForeground); font-size: 12px;">Long Responses</div>
               <div style="font-size: 20px; font-weight: bold;">${analysis.longResponseCount}</div>
-            </div>
-            <div>
-              <div style="color: var(--vscode-descriptionForeground); font-size: 12px;">Model Issues Found</div>
-              <div style="font-size: 20px; font-weight: bold; color: var(--vscode-inputValidation-warningBorder);">${analysis.inappropriateModelCount}</div>
             </div>
           </div>
         </div>
