@@ -2,7 +2,7 @@
   "name": "copilot-token-inspector",
   "displayName": "Copilot Token Inspector",
   "description": "Real-time token usage tracking and cost analysis for GitHub Copilot sessions",
-  "version": "0.1.3",
+  "version": "0.1.4",
   "publisher": "SENTHILKUMARG",
   "license": "MIT",
   "engines": {
